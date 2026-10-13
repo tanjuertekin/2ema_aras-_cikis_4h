@@ -30,6 +30,14 @@ function addLog(msg) {
     if (botState.logs.length > 150) botState.logs.shift();
 }
 
+// Binance istekleri için engellenmeyi önleyen tarayıcı başlıkları (Headers)
+const fetchHeaders = {
+    headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json'
+    }
+};
+
 // Teknik İndikatör Hesaplamaları
 function calculateEMA(data, period) {
     let k = 2 / (period + 1);
@@ -125,12 +133,12 @@ function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
     return bandwidthArray;
 }
 
-// Otomatik Arka Plan Tarama Motoru (Vision API - Spot v3 Endpoint)
+// Otomatik Arka Plan Tarama Motoru (Binance Futures - fapi)
 async function arkaPlanTaramasiYap() {
     try {
-        addLog("Arka plan taraması başlatıldı...");
+        addLog("Arka plan taraması başlatıldı (Futures)...");
         
-        let res = await fetch('https://data.binance.vision/api/v3/ticker/24hr');
+        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr', fetchHeaders);
         
         if (!res.ok) {
             addLog(`Tarama Hatası: HTTP Durum Kodu: ${res.status}`);
@@ -144,11 +152,11 @@ async function arkaPlanTaramasiYap() {
             return;
         }
 
-        let top50 = data.filter(i => i.symbol.endsWith('USDT') && !i.symbol.includes('USDC') && !i.symbol.includes('UP') && !i.symbol.includes('DOWN'))
+        let top50 = data.filter(i => i.symbol.endsWith('USDT') && !i.symbol.includes('USDC'))
             .sort((a,b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume)).slice(0, 50);
 
         let anlikFiyatlarMap = {};
-        data.forEach(p => anlikFiyatlarMap[p.symbol] = parseFloat(p.price));
+        data.forEach(p => anlikFiyatlarMap[p.symbol] = parseFloat(p.lastPrice));
 
         let toplamDegisim = top50.reduce((acc, curr) => acc + parseFloat(curr.priceChangePercent), 0);
         let ortalamaDegisim = toplamDegisim / top50.length;
@@ -158,7 +166,7 @@ async function arkaPlanTaramasiYap() {
         let btcBogaMi = true;
 
         try {
-            let btcRes = await fetch(`https://data.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=50`);
+            let btcRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${tf}&limit=50`, fetchHeaders);
             let btcKlines = await btcRes.json();
             if (Array.isArray(btcKlines) && btcKlines.length >= 30) {
                 let btcCloses = btcKlines.map(k => parseFloat(k[4]));
@@ -176,7 +184,7 @@ async function arkaPlanTaramasiYap() {
             let adx = parseFloat((Math.random() * 30 + 15).toFixed(2));
             if (adx < 20) continue;
 
-            let kRes = await fetch(`https://data.binance.vision/api/v3/klines?symbol=${symbol}&interval=${tf}&limit=50`);
+            let kRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=50`, fetchHeaders);
             let klines = await kRes.json();
             if (!Array.isArray(klines) || klines.length < 35) continue;
 
@@ -242,11 +250,11 @@ async function arkaPlanTaramasiYap() {
     }
 }
 
-// Açık İşlemleri Takip Eden Döngü
+// Açık İşlemleri Takip Eden Döngü (Futures Fiyatları)
 async function acikIslemleriTakipEt() {
     if (botState.acikIslemler.length === 0) return;
     try {
-        let res = await fetch('https://data.binance.vision/api/v3/ticker/price');
+        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/price', fetchHeaders);
         let prices = await res.json();
         if (!Array.isArray(prices)) return;
         
