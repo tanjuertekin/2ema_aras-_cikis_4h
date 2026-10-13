@@ -30,13 +30,14 @@ function addLog(msg) {
     if (botState.logs.length > 150) botState.logs.shift();
 }
 
-// Engelsiz Vision Futures Endpoint'leri (418 hatasını çözer)
-const FAPI_BASE = 'https://data.binance.vision/fapi/v1';
+// Binance Futures Resmi Adresi (Proxy / Agent Destekli)
+const FAPI_BASE = 'https://fapi.binance.com/fapi/v1';
 
 const fetchHeaders = {
     headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
     }
 };
 
@@ -135,10 +136,10 @@ function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
     return bandwidthArray;
 }
 
-// Otomatik Arka Plan Tarama Motoru (Engelsiz Vision Futures)
+// Otomatik Arka Plan Tarama Motoru (Binance Futures)
 async function arkaPlanTaramasiYap() {
     try {
-        addLog("Arka plan taraması başlatıldı (Engelsiz Futures)...");
+        addLog("Arka plan taraması başlatıldı (Futures)...");
         
         let res = await fetch(`${FAPI_BASE}/ticker/24hr`, fetchHeaders);
         
