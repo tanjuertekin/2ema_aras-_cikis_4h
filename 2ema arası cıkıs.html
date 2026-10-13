@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kripto Test Paneli (Tamamen Düzeltilmiş Sürüm)</title>
+    <title>Kripto Test Paneli (7/24 Arka Plan Modu)</title>
     <style>
         :root {
             --bg-primary: #1c1613;
@@ -367,7 +367,7 @@
         </div>
     </div>
 
-    <h1>Kripto Test Paneli</h1>
+    <h1>Kripto Test Paneli (7/24 Bulut Modu)</h1>
 
     <div class="top-bar">
         <div class="top-bar-left">
@@ -386,13 +386,7 @@
                 <option value="4h" selected>4h (Swing)</option>
                 <option value="1d">1d</option>
             </select>
-            <select id="autoScanInterval" class="tf-select" onchange="otoAyarDegisti()">
-                <option value="0">Oto Tarama Kapalı</option>
-                <option value="5">Her 5 Dakika</option>
-                <option value="15">Her 15 Dakika</option>
-                <option value="30">Her 30 Dakika</option>
-            </select>
-            <button class="btn-scan" onclick="taramayiBaslat(false)">Taramayı Başlat</button>
+            <span style="color: var(--green); font-weight: bold; font-size: 14px;">⚡ Arka Planda 7/24 Oto Tarama Aktif</span>
             <button class="info-btn" onclick="modalAc()">i</button>
         </div>
     </div>
@@ -401,7 +395,7 @@
         <div class="market-badge">Piyasa Yönü: <strong id="piyasaYonText" style="color: var(--accent-gold);">Bekleniyor...</strong></div>
         <div class="market-badge">BTC Yönü (EMA21 + ADX): <strong id="btcYonText" style="color: var(--accent-gold);">Bekleniyor...</strong></div>
         <div class="market-badge">TP Durumu: <strong id="tpDurumText" style="color: var(--red);">Kapalı</strong></div>
-        <div class="market-badge">Oto Tarama: <strong id="otoDurumText" style="color: var(--accent-gold);">Kapalı</strong></div>
+        <div class="market-badge">Bot Durumu: <strong id="otoDurumText" style="color: var(--green);">Bulutta Çalışıyor</strong></div>
     </div>
 
     <div class="stats-container">
@@ -441,7 +435,7 @@
             </tr>
         </thead>
         <tbody id="scanTableBody">
-            <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Tarama başlatın.</td></tr>
+            <tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Sunucudan veriler yükleniyor...</td></tr>
         </tbody>
     </table>
 
@@ -468,7 +462,6 @@
 
     <div class="section-header">
         <h2>Kapatılan İşlemler Geçmişi</h2>
-        <button class="btn-danger" onclick="gecmisiSifirla()">Geçmişi Sıfırla</button>
     </div>
     <table>
         <thead>
@@ -486,39 +479,16 @@
         </tbody>
     </table>
 
-    <h3>Sistem Logları</h3>
+    <h3>Sistem Logları (Bulut Sunucu)</h3>
     <div class="logs-box" id="logsBox">
-        [Test Paneli] Hazır.<br>
+        [Panel] Sunucuya bağlanılıyor...<br>
     </div>
 
     <script>
-        let tarananSonuclar = [];
-        let acikIslemler = JSON.parse(localStorage.getItem('test_acikIslemler_ema_v13')) || [];
-        let kapatilanIslemler = JSON.parse(localStorage.getItem('test_kapatilanIslemler_ema_v13')) || [];
         let tpAktif = JSON.parse(localStorage.getItem('test_tpAktif_ema_v13')) || false;
-        let otoTaramaTimer = null;
-        let btcBogaMi = true;
-        let anlikFiyatlarMap = {};
-        const ORTALAMA_KOMISYON = 0.09;
-
         document.getElementById('tpAktifCheckbox').checked = tpAktif;
         document.getElementById('tpDurumText').innerText = tpAktif ? "Açık (%50 TP)" : "Kapalı";
         document.getElementById('tpDurumText').style.color = tpAktif ? "var(--green)" : "var(--red)";
-
-        window.onload = function() {
-            fiyatlariGuncelleBaslangic().then(() => {
-                tablolariGuncelle();
-                istatistikleriGuncelle();
-            });
-        };
-
-        async function fiyatlariGuncelleBaslangic() {
-            try {
-                let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/price');
-                let prices = await res.json();
-                prices.forEach(p => anlikFiyatlarMap[p.symbol] = parseFloat(p.price));
-            } catch (e) {}
-        }
 
         function modalAc() { document.getElementById('infoModal').style.display = 'flex'; }
         function modalKapat() { document.getElementById('infoModal').style.display = 'none'; }
@@ -529,462 +499,147 @@
             localStorage.setItem('test_tpAktif_ema_v13', JSON.stringify(tpAktif));
             document.getElementById('tpDurumText').innerText = tpAktif ? "Açık (%50 TP)" : "Kapalı";
             document.getElementById('tpDurumText').style.color = tpAktif ? "var(--green)" : "var(--red)";
-            logYaz(`[Ayar] %50 TP: ${tpAktif ? "Aktif" : "Pasif"}`);
         }
 
-        function verileriKaydet() {
-            localStorage.setItem('test_acikIslemler_ema_v13', JSON.stringify(acikIslemler));
-            localStorage.setItem('test_kapatilanIslemler_ema_v13', JSON.stringify(kapatilanIslemler));
+        function tfDegisti() {
+            let yeniTf = document.getElementById('timeframeSelect').value;
+            fetch('/api/set-timeframe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ timeframe: yeniTf })
+            }).then(res => res.json()).then(data => {
+                console.log("Zaman dilimi güncellendi:", data.timeframe);
+            });
         }
 
-        function getSimdiFormatli() {
-            let d = new Date();
-            let gun = String(d.getDate()).padStart(2, '0');
-            let ay = String(d.getMonth() + 1).padStart(2, '0');
-            let yil = d.getFullYear();
-            let saat = String(d.getHours()).padStart(2, '0');
-            let dk = String(d.getMinutes()).padStart(2, '0');
-            let sn = String(d.getSeconds()).padStart(2, '0');
-            return `${gun}.${ay}.${yil} ${saat}:${dk}:${sn}`;
-        }
-
-        function logYaz(mesaj) {
-            const box = document.getElementById('logsBox');
-            box.innerHTML += `[${new Date().toLocaleTimeString('tr-TR')}] ${mesaj}<br>`;
-            box.scrollTop = box.scrollHeight;
-        }
-
-        function tfDegisti() { logYaz(`Zaman dilimi: ${document.getElementById('timeframeSelect').value}`); }
-        
-        function otoAyarDegisti() {
-            let dk = parseInt(document.getElementById('autoScanInterval').value);
-            if (otoTaramaTimer) clearInterval(otoTaramaTimer);
-            if (dk > 0) {
-                document.getElementById('otoDurumText').innerText = `Her ${dk} dk`;
-                logYaz(`[Oto Tarama] Aktif edildi: Her ${dk} dakikada bir otomatik taranacak.`);
-                taramayiBaslat(true);
-                otoTaramaTimer = setInterval(() => taramayiBaslat(true), dk * 60 * 1000);
-            } else {
-                document.getElementById('otoDurumText').innerText = "Kapalı";
-                logYaz("[Oto Tarama] Kapatıldı.");
-            }
-        }
-
-        function calculateEMA(data, period) {
-            let k = 2 / (period + 1);
-            let emaArray = [];
-            let sum = 0;
-            for (let i = 0; i < period; i++) sum += data[i];
-            let prevEMA = sum / period;
-            emaArray[period - 1] = prevEMA;
-            for (let i = period; i < data.length; i++) {
-                let ema = (data[i] - prevEMA) * k + prevEMA;
-                emaArray[i] = ema;
-                prevEMA = ema;
-            }
-            return emaArray;
-        }
-
-        function calculateSMA(data, period) {
-            let smaArray = [];
-            for (let i = period - 1; i < data.length; i++) {
-                let sum = 0;
-                for (let j = i - period + 1; j <= i; j++) sum += data[j];
-                smaArray[i] = sum / period;
-            }
-            return smaArray;
-        }
-
-        function calculateATR(klines, period = 14) {
-            let trArray = [];
-            for (let i = 0; i < klines.length; i++) {
-                let h = parseFloat(klines[i][2]), l = parseFloat(klines[i][3]), c = parseFloat(klines[i][4]);
-                if (i === 0) trArray.push(h - l);
-                else trArray.push(Math.max(h - l, Math.abs(h - parseFloat(klines[i-1][4])), Math.abs(l - parseFloat(klines[i-1][4]))));
-            }
-            let atrArray = [];
-            let sum = 0;
-            for (let i = 0; i < period; i++) sum += trArray[i];
-            let prevATR = sum / period;
-            atrArray[period - 1] = prevATR;
-            for (let i = period; i < trArray.length; i++) {
-                let atr = (prevATR * (period - 1) + trArray[i]) / period;
-                atrArray[i] = atr;
-                prevATR = atr;
-            }
-            return atrArray;
-        }
-
-        function calculateRSI(closes, period = 14) {
-            let rsiArray = [];
-            let gains = 0, losses = 0;
-            for (let i = 1; i <= period; i++) {
-                let ch = closes[i] - closes[i - 1];
-                if (ch >= 0) gains += ch; else losses -= ch;
-            }
-            let avgGain = gains / period, avgLoss = losses / period;
-            rsiArray[period] = 100 - (100 / (1 + (avgLoss === 0 ? 100 : avgGain / avgLoss)));
-            for (let i = period + 1; i < closes.length; i++) {
-                let ch = closes[i] - closes[i - 1];
-                avgGain = (avgGain * (period - 1) + (ch >= 0 ? ch : 0)) / period;
-                avgLoss = (avgLoss * (period - 1) + (ch < 0 ? -ch : 0)) / period;
-                rsiArray[i] = 100 - (100 / (1 + (avgLoss === 0 ? 100 : avgGain / avgLoss)));
-            }
-            return rsiArray;
-        }
-
-        function calculateStochRSI(closes) {
-            let rsi = calculateRSI(closes, 14);
-            let kArr = [], dArr = [];
-            for (let i = 14; i < closes.length; i++) {
-                let slice = rsi.slice(Math.max(0, i - 13), i + 1);
-                let min = Math.min(...slice), max = Math.max(...slice);
-                let stoch = max === min ? 0 : ((rsi[i] - min) / (max - min)) * 100;
-                kArr[i] = stoch;
-            }
-            for (let i = 16; i < kArr.length; i++) {
-                dArr[i] = (kArr[i] + kArr[i-1] + kArr[i-2]) / 3;
-            }
-            return { k: kArr, d: dArr };
-        }
-
-        function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
-            let sma = calculateSMA(closes, period);
-            let bandwidthArray = [];
-            for (let i = period - 1; i < closes.length; i++) {
-                let slice = closes.slice(i - period + 1, i + 1);
-                let mean = sma[i];
-                let variance = slice.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / period;
-                let stDev = Math.sqrt(variance);
-                let upper = mean + (multiplier * stDev);
-                let lower = mean - (multiplier * stDev);
-                let bandwidth = (upper - lower) / mean;
-                bandwidthArray[i] = bandwidth;
-            }
-            return bandwidthArray;
-        }
-
-        async function taramayiBaslat(otomatikMi = false) {
-            let tf = document.getElementById('timeframeSelect').value;
-            logYaz(`Tarama başlatıldı [TF: ${tf}]...`);
-            tarananSonuclar = [];
-
+        // Sunucudaki bot durumunu her 3 saniyede bir çekip ekrana yansıtan ana döngü
+        async function sunucuVerileriniGetir() {
             try {
-                let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
+                let res = await fetch('/api/state');
                 let data = await res.json();
-                let top50 = data.filter(i => i.symbol.endsWith('USDT') && !i.symbol.includes('USDC'))
-                    .sort((a,b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume)).slice(0, 50);
 
-                data.forEach(p => anlikFiyatlarMap[p.symbol] = parseFloat(p.lastPrice));
-
-                let toplamDegisim = top50.reduce((acc, curr) => acc + parseFloat(curr.priceChangePercent), 0);
-                let ortalamaDegisim = toplamDegisim / top50.length;
-                document.getElementById('piyasaYonText').innerText = ortalamaDegisim >= 0 ? "Boğa" : "Ayı";
-                document.getElementById('piyasaYonText').style.color = ortalamaDegisim >= 0 ? "var(--green)" : "var(--red)";
-
-                try {
-                    let btcRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${tf}&limit=50`);
-                    let btcKlines = await btcRes.json();
-                    if (Array.isArray(btcKlines) && btcKlines.length >= 30) {
-                        let btcCloses = btcKlines.map(k => parseFloat(k[4]));
-                        let btcEma21 = calculateEMA(btcCloses, 21);
-                        let lastIdx = btcCloses.length - 2;
-                        
-                        let btcFiyat = btcCloses[lastIdx];
-                        let btcE21 = btcEma21[lastIdx];
-
-                        btcBogaMi = (btcFiyat >= btcE21);
-                        let btcYonStr = btcBogaMi ? "Boğa (EMA21 Üstü)" : "Ayı (EMA21 Altı)";
-                        document.getElementById('btcYonText').innerText = btcYonStr;
-                        document.getElementById('btcYonText').style.color = btcBogaMi ? "var(--green)" : "var(--red)";
-                    }
-                } catch (e) {}
-
-                for (let item of top50) {
-                    let symbol = item.symbol;
-                    let adx = parseFloat((Math.random() * 30 + 15).toFixed(2));
-                    if (adx < 20) continue;
-
-                    let kRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=50`);
-                    let klines = await kRes.json();
-                    if (!Array.isArray(klines) || klines.length < 35) continue;
-
-                    let closes = klines.map(k => parseFloat(k[4]));
-                    let ema9 = calculateEMA(closes, 9);
-                    let ema21 = calculateEMA(closes, 21);
-                    let atr = calculateATR(klines, 14);
-                    let rsi = calculateRSI(closes, 14);
-                    let stoch = calculateStochRSI(closes);
-                    let bbWidths = calculateBollingerBandwidth(closes);
-
-                    let len = closes.length;
-                    for (let i = len - 6; i < len - 2; i++) {
-                        let isLong = (ema9[i-1] <= ema21[i-1] && ema9[i] > ema21[i]);
-                        let isShort = (ema9[i-1] >= ema21[i-1] && ema9[i] < ema21[i]);
-                        if (!isLong && !isShort) continue;
-
-                        let currentWidth = bbWidths[i] || 0;
-                        let sliceWidths = bbWidths.slice(Math.max(0, i - 20), i);
-                        let avgWidth = sliceWidths.length > 0 ? sliceWidths.reduce((a, b) => a + b, 0) / sliceWidths.length : currentWidth;
-                        let sıkismaVarMi = currentWidth < (avgWidth * 0.75);
-
-                        if (!sıkismaVarMi) continue;
-
-                        let open2 = parseFloat(klines[i+1][1]), close2 = parseFloat(klines[i+1][4]);
-                        let vol2 = parseFloat(klines[i+1][5]), size2 = parseFloat(klines[i+1][2]) - parseFloat(klines[i+1][3]);
-                        let pVol = (parseFloat(klines[i-1][5]) + parseFloat(klines[i][5])) / 2;
-                        let pSize = ((parseFloat(klines[i-1][2])-parseFloat(klines[i-1][3])) + (parseFloat(klines[i][2])-parseFloat(klines[i][3]))) / 2;
-
-                        let onay = false;
-                        let yon = isLong ? "LONG" : "SHORT";
-
-                        if (btcBogaMi && yon === "SHORT") continue;
-                        if (!btcBogaMi && yon === "LONG") continue;
-
-                        if (yon === "LONG" && (close2 >= open2 || (vol2 < pVol && size2 < pSize))) onay = true;
-                        if (yon === "SHORT" && (close2 <= open2 || (vol2 < pVol && size2 < pSize))) onay = true;
-
-                        if (onay) {
-                            let anlikFiyat = anlikFiyatlarMap[symbol] || close2;
-                            let stop = yon === "LONG" ? ema21[i] - (atr[i] * 1.5) : ema21[i] + (atr[i] * 1.5);
-                            let tp = yon === "LONG" ? anlikFiyat + ((anlikFiyat - stop) * 2) : anlikFiyat - ((stop - anlikFiyat) * 2);
-
-                            tarananSonuclar.push({
-                                symbol, yon, adx,
-                                stochInfo: `K:${stoch.k[len-2]?.toFixed(1)} RSI:${rsi[len-2]?.toFixed(1)}`,
-                                giris: anlikFiyat, stop, tp, tf
-                            });
-                            break;
-                        }
-                    }
-                }
+                // Piyasa ve BTC Yönü
+                document.getElementById('piyasaYonText').innerText = data.piyasaYon;
+                document.getElementById('piyasaYonText').style.color = data.piyasaYon === "Boğa" ? "var(--green)" : "var(--red)";
                 
-                tablolariGuncelle();
-                logYaz(`Tarama bitti. Uygun parite: ${tarananSonuclar.length}`);
+                document.getElementById('btcYonText').innerText = data.btcYon;
+                document.getElementById('btcYonText').style.color = data.btcYon.includes("Boğa") ? "var(--green)" : "var(--red)";
 
-                if (otomatikMi && tarananSonuclar.length > 0) {
-                    let eklenen = 0;
-                    tarananSonuclar.forEach(item => {
-                        if (!acikIslemler.some(i => i.symbol === item.symbol && i.tf === item.tf)) {
-                            acikIslemler.push({
-                                ...item,
-                                anlikFiyat: item.giris,
-                                tpYapildi: false,
-                                zamanMs: Date.now(),
-                                zaman: getSimdiFormatli()
-                            });
-                            eklenen++;
-                        }
-                    });
-                    if (eklenen > 0) {
-                        verileriKaydet();
-                        tablolariGuncelle();
-                        istatistikleriGuncelle();
-                        logYaz(`[Oto İşlem] ${eklenen} yeni sinyal otomatik takibe eklendi.`);
-                    }
-                }
-            } catch (e) { logYaz("Hata: " + e.message); }
-        }
+                document.getElementById('lastScanTime').innerText = "Son Tarama: " + data.lastScanTime;
 
-        function islemAc(idx) {
-            let item = tarananSonuclar[idx];
-            if (acikIslemler.some(i => i.symbol === item.symbol && i.tf === item.tf)) return;
+                // Tabloları doldur
+                tablolariGuncelle(data);
+                istatistikleriGuncelle(data.acikIslemler, data.kapatilanIslemler);
+                loglariGuncelle(data.logs);
 
-            let guncelGiris = anlikFiyatlarMap[item.symbol] || item.giris;
-            let stopFark = Math.abs(item.giris - item.stop);
-            let yeniStop = item.yon === "LONG" ? guncelGiris - stopFark : guncelGiris + stopFark;
-            let yeniTp = item.yon === "LONG" ? guncelGiris + (stopFark * 2) : guncelGiris - (stopFark * 2);
-
-            acikIslemler.push({
-                ...item,
-                giris: guncelGiris,
-                stop: yeniStop,
-                tp: yeniTp,
-                anlikFiyat: guncelGiris,
-                tpYapildi: false,
-                zamanMs: Date.now(),
-                zaman: getSimdiFormatli()
-            });
-            verileriKaydet();
-            tablolariGuncelle();
-            istatistikleriGuncelle();
-            logYaz(`[AÇILDI] ${item.symbol} (${item.yon}) - Giriş: ${guncelGiris}`);
-        }
-
-        function pariteVerisiKopyala(symbol, tf) {
-            let islem = acikIslemler.find(i => i.symbol === symbol && i.tf === tf);
-            if (!islem) return;
-            
-            let metin = `yön : ${islem.yon}\ntarih : ${islem.zaman}\ngiriş : ${islem.giris.toFixed(4)}\nstop : ${islem.stop.toFixed(4)}\ntp : ${islem.tp.toFixed(4)}`;
-            
-            navigator.clipboard.writeText(metin).then(() => {
-                logYaz(`[KOPYALANDI] ${symbol} bilgileri Pine formatında panoya kopyalandı.`);
-            });
-        }
-
-        async function canliGuncelle() {
-            try {
-                let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/price');
-                let prices = await res.json();
-                let pMap = {};
-                prices.forEach(p => {
-                    let pVal = parseFloat(p.price);
-                    pMap[p.symbol] = pVal;
-                    anlikFiyatlarMap[p.symbol] = pVal;
-                });
-
-                if (acikIslemler.length === 0) {
-                    tablolariGuncelle();
-                    return;
-                }
-
-                for (let i = acikIslemler.length - 1; i >= 0; i--) {
-                    let item = acikIslemler[i];
-                    if (!pMap[item.symbol]) continue;
-                    item.anlikFiyat = pMap[item.symbol];
-
-                    if (tpAktif && !item.tpYapildi) {
-                        if ((item.yon === "LONG" && item.anlikFiyat >= item.tp) || (item.yon === "SHORT" && item.anlikFiyat <= item.tp)) {
-                            item.tpYapildi = true;
-                            item.stop = item.giris; 
-                            let pnl = item.yon === "LONG" ? ((item.tp - item.giris)/item.giris)*100 : ((item.giris - item.tp)/item.giris)*100;
-                            
-                            kapatilanIslemler.unshift({
-                                ...item, cikis: item.tp, sonuc: "%50 TP HIT", pnl: pnl - ORTALAMA_KOMISYON, kapanisZamani: getSimdiFormatli()
-                            });
-                            logYaz(`[%50 TP] ${item.symbol} hedefe ulaştı.`);
-                            verileriKaydet();
-                        }
-                    }
-
-                    if ((item.yon === "LONG" && item.anlikFiyat <= item.stop) || (item.yon === "SHORT" && item.anlikFiyat >= item.stop)) {
-                        let sonucTuru = item.tpYapildi ? "KALAN %50 STOP" : "STOP HIT";
-                        islemKapat(item.symbol, item.stop, sonucTuru);
-                        continue;
-                    }
-
-                    let kRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${item.symbol}&interval=${item.tf}&limit=12`);
-                    let klines = await kRes.json();
-                    if (Array.isArray(klines) && klines.length >= 10) {
-                        let closes = klines.map(k => parseFloat(k[4]));
-                        let ema9 = calculateEMA(closes, 9);
-                        let len = closes.length;
-                        let closePrev = closes[len - 3], emaPrev = ema9[len - 3];
-                        let closeCurr = closes[len - 2], emaCurr = ema9[len - 2];
-
-                        if (item.yon === "LONG") {
-                            if (closePrev < emaPrev && closeCurr < emaCurr) {
-                                islemKapat(item.symbol, closeCurr, "EMA ÇIKIŞI (9 EMA Altı 2 Mum)");
-                            }
-                        } else if (item.yon === "SHORT") {
-                            if (closePrev > emaPrev && closeCurr > emaCurr) {
-                                islemKapat(item.symbol, closeCurr, "EMA ÇIKIŞI (9 EMA Üstü 2 Mum)");
-                            }
-                        }
-                    }
-                }
-                verileriKaydet();
-                tablolariGuncelle();
-                istatistikleriGuncelle();
-            } catch (e) {}
-        }
-
-        function islemKapat(symbol, cikisFiyati, sonuc) {
-            let idx = acikIslemler.findIndex(i => i.symbol === symbol);
-            if (idx !== -1) {
-                let item = acikIslemler.splice(idx, 1)[0];
-                let ham = item.yon === "LONG" ? ((cikisFiyati - item.giris)/item.giris)*100 : ((item.giris - cikisFiyati)/item.giris)*100;
-                let net = ham - ORTALAMA_KOMISYON;
-                
-                kapatilanIslemler.unshift({
-                    ...item, cikis: cikisFiyati, sonuc: sonuc, pnl: net, kapanisZamani: getSimdiFormatli()
-                });
-                verileriKaydet();
-                logYaz(`[KAPANDI] ${symbol} - Sonuç: ${sonuc} | PnL: %${net.toFixed(2)}`);
-                tablolariGuncelle();
-                istatistikleriGuncelle();
+            } catch (e) {
+                console.error("Sunucu bağlantı hatası:", e);
             }
         }
 
-        function gecmisiSifirla() {
-            kapatilanIslemler = [];
-            verileriKaydet();
-            tablolariGuncelle();
-            istatistikleriGuncelle();
+        function tablolariGuncelle(data) {
+            // 1. Tarama Sonuçları Tablosu
+            let sBody = document.getElementById('scanTableBody');
+            if (!data.tarananSonuclar || data.tarananSonuclar.length === 0) {
+                sBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Bulutta henüz eşleşen sinyal taranmadı (Bekleniyor...).</td></tr>';
+            } else {
+                sBody.innerHTML = '';
+                data.tarananSonuclar.forEach((item, idx) => {
+                    let zatenVar = data.acikIslemler.some(i => i.symbol === item.symbol && i.tf === item.tf);
+                    sBody.innerHTML += `<tr>
+                        <td><span class="badge-tf">${item.tf}</span> <strong>${item.symbol}</strong></td>
+                        <td><span class="${item.yon === "LONG" ? "badge-long" : "badge-short"}">${item.yon}</span></td>
+                        <td style="color: var(--accent-gold);">${item.adx}</td>
+                        <td style="font-size: 13px;">${item.stochInfo}</td>
+                        <td>${item.giris.toFixed(4)}</td>
+                        <td style="color: var(--red);">${item.stop.toFixed(4)}</td>
+                        <td style="color: var(--green);">${tpAktif ? item.tp.toFixed(4) : "Kapalı"}</td>
+                        <td>${zatenVar ? '<span style="color: var(--text-muted);">Takipte</span>' : '<span style="color: var(--accent-gold);">Oto Eklenir</span>'}</td>
+                    </tr>`;
+                });
+            }
+
+            // 2. Açık İşlemler Tablosu
+            let oBody = document.getElementById('openTradesBody');
+            if (!data.acikIslemler || data.acikIslemler.length === 0) {
+                oBody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Açık işlem yok.</td></tr>';
+            } else {
+                oBody.innerHTML = '';
+                let toplamAcikPnl = 0;
+                data.acikIslemler.forEach(item => {
+                    let pnl = item.yon === "LONG" ? ((item.anlikFiyat - item.giris)/item.giris)*100 : ((item.giris - item.anlikFiyat)/item.giris)*100;
+                    toplamAcikPnl += pnl;
+
+                    oBody.innerHTML += `<tr>
+                        <td><span class="badge-tf">${item.tf}</span> <strong class="symbol-clickable" onclick="pariteVerisiKopyala('${item.symbol}', '${item.tf}', ${JSON.stringify(data.acikIslemler).replace(/"/g, '&quot;')})" title="Pine formatında kopyala">${item.symbol}</strong></td>
+                        <td><span class="${item.yon === "LONG" ? "badge-long" : "badge-short"}">${item.yon}</span></td>
+                        <td>${item.giris.toFixed(4)}<br><span style="color:var(--accent-gold); font-size:11px;">${item.zaman}</span></td>
+                        <td><strong>${item.anlikFiyat.toFixed(4)}</strong></td>
+                        <td style="color:var(--red);">Stop: ${item.stop.toFixed(4)}<br>${tpAktif ? 'TP: ' + item.tp.toFixed(4) : ''}</td>
+                        <td style="color: ${pnl >= 0 ? "var(--green)" : "var(--red)"}; font-weight: bold;">%${pnl.toFixed(2)}</td>
+                        <td>${Math.floor((Date.now() - (item.zamanMs || Date.now()))/60000)} dk</td>
+                        <td><span style="color: var(--text-muted);">Bulut Botu</span></td>
+                    </tr>`;
+                });
+
+                let thPnlEl = document.getElementById('thToplamPnl');
+                let isaret = toplamAcikPnl >= 0 ? "+" : "";
+                let renk = toplamAcikPnl >= 0 ? "var(--green)" : "var(--red)";
+                thPnlEl.innerHTML = `Anlık PnL %: <span style="color: ${renk}">${isaret}${toplamAcikPnl.toFixed(2)}%</span>`;
+            }
+
+            // 3. Kapatılan İşlemler Tablosu
+            let cBody = document.getElementById('closedTradesBody');
+            if (!data.kapatilanIslemler || data.kapatilanIslemler.length === 0) {
+                cBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Kayıt yok.</td></tr>';
+            } else {
+                cBody.innerHTML = '';
+                data.kapatilanIslemler.forEach(item => {
+                    cBody.innerHTML += `<tr>
+                        <td><span class="badge-tf">${item.tf}</span> <strong>${item.symbol}</strong></td>
+                        <td><span class="${item.yon === "LONG" ? "badge-long" : "badge-short"}">${item.yon}</span></td>
+                        <td>${item.giris.toFixed(4)}<br><span style="color: var(--accent-gold); font-size: 11px;">${item.zaman}</span></td>
+                        <td>${item.cikis.toFixed(4)}<br><span style="color: var(--text-muted); font-size: 11px;">${item.kapanisZamani}</span></td>
+                        <td style="color:var(--red); font-weight:bold;">${item.sonuc}</td>
+                        <td style="color: ${item.pnl >= 0 ? "var(--green)" : "var(--red)"}; font-weight: bold;">%${item.pnl.toFixed(2)}</td>
+                    </tr>`;
+                });
+            }
         }
 
-        function istatistikleriGuncelle() {
-            document.getElementById('statAcikSayi').innerText = acikIslemler.length;
-            document.getElementById('statKapatilanSayi').innerText = kapatilanIslemler.length;
+        function istatistikleriGuncelle(acik, kapatilan) {
+            document.getElementById('statAcikSayi').innerText = acik ? acik.length : 0;
+            document.getElementById('statKapatilanSayi').innerText = kapatilan ? kapatilan.length : 0;
+            
             let tpnl = 0, kazan = 0;
-            kapatilanIslemler.forEach(i => { tpnl += i.pnl; if (i.pnl > 0) kazan++; });
+            if (kapatilan) {
+                kapatilan.forEach(i => { tpnl += i.pnl; if (i.pnl > 0) kazan++; });
+            }
             let pnlEl = document.getElementById('statToplamPnl');
             pnlEl.innerText = (tpnl >= 0 ? "+" : "") + tpnl.toFixed(2) + "%";
             pnlEl.style.color = tpnl >= 0 ? "var(--green)" : "var(--red)";
-            document.getElementById('statWinRate').innerText = "%" + (kapatilanIslemler.length ? (kazan / kapatilanIslemler.length * 100).toFixed(1) : 0);
+            document.getElementById('statWinRate').innerText = "%" + (kapatilan && kapatilan.length ? (kazan / kapatilan.length * 100).toFixed(1) : 0);
         }
 
-        function tablolariGuncelle() {
-            let sBody = document.getElementById('scanTableBody');
-            sBody.innerHTML = tarananSonuclar.length === 0 ? '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Uygun sonuç yok.</td></tr>' : '';
-            tarananSonuclar.forEach((item, idx) => {
-                let zatenVar = acikIslemler.some(i => i.symbol === item.symbol && i.tf === item.tf);
-                let anlikTaramaFiyat = anlikFiyatlarMap[item.symbol] || item.giris;
-                sBody.innerHTML += `<tr>
-                    <td><span class="badge-tf">${item.tf}</span> <strong>${item.symbol}</strong></td>
-                    <td><span class="${item.yon === "LONG" ? "badge-long" : "badge-short"}">${item.yon}</span></td>
-                    <td style="color: var(--accent-gold);">${item.adx}</td>
-                    <td style="font-size: 13px;">${item.stochInfo}</td>
-                    <td>${anlikTaramaFiyat.toFixed(4)}</td>
-                    <td style="color: var(--red);">${item.stop.toFixed(4)}</td>
-                    <td style="color: var(--green);">${tpAktif ? item.tp.toFixed(4) : "Kapalı"}</td>
-                    <td>${zatenVar ? '<span style="color: var(--text-muted);">Açık</span>' : `<button class="btn-action" onclick="islemAc(${idx})">İşlem Aç</button>`}</td>
-                </tr>`;
-            });
+        function loglariGuncelle(logs) {
+            if (!logs) return;
+            const box = document.getElementById('logsBox');
+            box.innerHTML = logs.join('<br>');
+            box.scrollTop = box.scrollHeight;
+        }
 
-            let toplamAcikPnl = 0;
-            let oBody = document.getElementById('openTradesBody');
-            oBody.innerHTML = acikIslemler.length === 0 ? '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Açık işlem yok.</td></tr>' : '';
-            
-            acikIslemler.forEach(item => {
-                let pnl = item.yon === "LONG" ? ((item.anlikFiyat - item.giris)/item.giris)*100 : ((item.giris - item.anlikFiyat)/item.giris)*100;
-                toplamAcikPnl += pnl;
-
-                oBody.innerHTML += `<tr>
-                    <td><span class="badge-tf">${item.tf}</span> <strong class="symbol-clickable" onclick="pariteVerisiKopyala('${item.symbol}', '${item.tf}')" title="Pine Script formatında kopyalamak için tıkla">${item.symbol}</strong></td>
-                    <td><span class="${item.yon === "LONG" ? "badge-long" : "badge-short"}">${item.yon}</span></td>
-                    <td>${item.giris.toFixed(4)}<br><span style="color:var(--accent-gold); font-size:11px;">${item.zaman}</span></td>
-                    <td><strong>${item.anlikFiyat.toFixed(4)}</strong></td>
-                    <td style="color:var(--red);">Stop: ${item.stop.toFixed(4)}<br>${tpAktif ? 'TP: ' + item.tp.toFixed(4) : ''}</td>
-                    <td style="color: ${pnl >= 0 ? "var(--green)" : "var(--red)"}; font-weight: bold;">%${pnl.toFixed(2)}</td>
-                    <td>${Math.floor((Date.now() - (item.zamanMs || Date.now()))/60000)} dk</td>
-                    <td><button class="btn-danger" onclick="islemKapat('${item.symbol}', ${item.anlikFiyat}, 'MANUEL')">Kapat</button></td>
-                </tr>`;
-            });
-
-            let thPnlEl = document.getElementById('thToplamPnl');
-            let isaret = toplamAcikPnl >= 0 ? "+" : "";
-            let renk = toplamAcikPnl >= 0 ? "var(--green)" : "var(--red)";
-            thPnlEl.innerHTML = `Anlık PnL %: <span style="color: ${renk}">${isaret}${toplamAcikPnl.toFixed(2)}%</span>`;
-
-            let cBody = document.getElementById('closedTradesBody');
-            cBody.innerHTML = kapatilanIslemler.length === 0 ? '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Kayıt yok.</td></tr>' : '';
-            kapatilanIslemler.forEach(item => {
-                let acilisZamanStr = item.zaman ? item.zaman : "Bilinmiyor";
-                let kapanisZamanStr = item.kapanisZamani ? item.kapanisZamani : "Bilinmiyor";
-
-                cBody.innerHTML += `<tr>
-                    <td><span class="badge-tf">${item.tf}</span> <strong>${item.symbol}</strong></td>
-                    <td><span class="${item.yon === "LONG" ? "badge-long" : "badge-short"}">${item.yon}</span></td>
-                    <td>${item.giris.toFixed(4)}<br><span style="color: var(--accent-gold); font-size: 11px; font-weight: bold;">${acilisZamanStr}</span></td>
-                    <td>${item.cikis.toFixed(4)}<br><span style="color: var(--text-muted); font-size: 11px;">${kapanisZamanStr}</span></td>
-                    <td style="color:var(--red); font-weight:bold;">${item.sonuc}</td>
-                    <td style="color: ${item.pnl >= 0 ? "var(--green)" : "var(--red)"}; font-weight: bold;">%${item.pnl.toFixed(2)}</td>
-                </tr>`;
+        function pariteVerisiKopyala(symbol, tf, acikListe) {
+            let islem = acikListe.find(i => i.symbol === symbol && i.tf === tf);
+            if (!islem) return;
+            let metin = `yön : ${islem.yon}\ntarih : ${islem.zaman}\ngiriş : ${islem.giris.toFixed(4)}\nstop : ${islem.stop.toFixed(4)}\ntp : ${islem.tp.toFixed(4)}`;
+            navigator.clipboard.writeText(metin).then(() => {
+                alert(`${symbol} bilgileri panoya kopyalandı!`);
             });
         }
 
-        setInterval(canliGuncelle, 3000);
+        // Her 3 saniyede bir sunucudaki güncel durumu ekrana getir
+        setInterval(sunucuVerileriniGetir, 3000);
+        window.onload = sunucuVerileriniGetir;
     </script>
 </body>
 </html>
