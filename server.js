@@ -8,12 +8,12 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// Bellekte tutulan bot durumu ve veriler
+// Bellekte (sunucuda) tutulan bot durumu ve hafızası
 let botState = {
     status: "running",
     startTime: new Date().toISOString(),
     lastScanTime: "Henüz taranmadı",
-    timeframe: "4h", // Varsayılan zaman dilimi
+    timeframe: "4h",
     piyasaYon: "Bekleniyor",
     btcYon: "Bekleniyor",
     tarananSonuclar: [],
@@ -27,10 +27,10 @@ function addLog(msg) {
     const logLine = `[${timeStr}] ${msg}`;
     console.log(logLine);
     botState.logs.push(logLine);
-    if (botState.logs.length > 100) botState.logs.shift(); // Son 100 logu tut
+    if (botState.logs.length > 150) botState.logs.shift();
 }
 
-// Teknik İndikatör Hesaplama Fonksiyonları
+// Teknik İndikatör Hesaplamaları
 function calculateEMA(data, period) {
     let k = 2 / (period + 1);
     let emaArray = [];
@@ -129,17 +129,13 @@ function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
 async function arkaPlanTaramasiYap() {
     try {
         addLog("Arka plan taraması başlatıldı...");
-        let res = await fetch('https://api.binance.com/api/v3/ticker/24hr');
-        if (!res.ok) {
-            // Fapi yedek
-            res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
-        }
+        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
         let data = await res.json();
         let top50 = data.filter(i => i.symbol.endsWith('USDT') && !i.symbol.includes('USDC'))
             .sort((a,b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume)).slice(0, 50);
 
         let anlikFiyatlarMap = {};
-        data.forEach(p => anlikFiyatlarMap[p.symbol] = parseFloat(p.lastPrice || p.price));
+        data.forEach(p => anlikFiyatlarMap[p.symbol] = parseFloat(p.price));
 
         let toplamDegisim = top50.reduce((acc, curr) => acc + parseFloat(curr.priceChangePercent), 0);
         let ortalamaDegisim = toplamDegisim / top50.length;
@@ -213,9 +209,9 @@ async function arkaPlanTaramasiYap() {
 
         botState.tarananSonuclar = yeniSonuclar;
         botState.lastScanTime = new Date().toLocaleString('tr-TR');
-        addLog(`Tarama tamamlandı. Bulunan sinyal: ${yeniSonuclar.length}`);
+        addLog(`Tarama bitti. Uygun parite: ${yeniSonuclar.length}`);
 
-        // Otomatik işlem açma mekanizması (Arka planda direkt işleme ekle)
+        // Otomatik İşlem Açma
         yeniSonuclar.forEach(item => {
             if (!botState.acikIslemler.some(i => i.symbol === item.symbol && i.tf === item.tf)) {
                 botState.acikIslemler.push({
@@ -234,7 +230,7 @@ async function arkaPlanTaramasiYap() {
     }
 }
 
-// Açık işlemleri sürekli takip eden döngü (Her 10 saniyede bir)
+// Açık İşlemleri Takip Eden Döngü
 async function acikIslemleriTakipEt() {
     if (botState.acikIslemler.length === 0) return;
     try {
@@ -248,7 +244,7 @@ async function acikIslemleriTakipEt() {
             if (!pMap[item.symbol]) continue;
             item.anlikFiyat = pMap[item.symbol];
 
-            // Stop kontrolü
+            // Stop Kontrolü
             if ((item.yon === "LONG" && item.anlikFiyat <= item.stop) || (item.yon === "SHORT" && item.anlikFiyat >= item.stop)) {
                 islemKapatArkaPlanda(item.symbol, item.stop, "STOP HIT");
             }
@@ -261,7 +257,7 @@ function islemKapatArkaPlanda(symbol, cikisFiyati, sonuc) {
     if (idx !== -1) {
         let item = botState.acikIslemler.splice(idx, 1)[0];
         let ham = item.yon === "LONG" ? ((cikisFiyati - item.giris)/item.giris)*100 : ((item.giris - cikisFiyati)/item.giris)*100;
-        let net = ham - 0.09; // Komisyon
+        let net = ham - 0.09;
         
         botState.kapatilanIslemler.unshift({
             ...item, cikis: cikisFiyati, sonuc: sonuc, pnl: net, kapanisZamani: new Date().toLocaleString('tr-TR')
@@ -270,32 +266,21 @@ function islemKapatArkaPlanda(symbol, cikisFiyati, sonuc) {
     }
 }
 
-// API Endpointleri (Frontend arayüzü verileri bur ejecutivo'dan çekecek)
+// Arayüzün sunucudan verileri çekmesi için API endpoint'i
 app.get('/api/state', (req, res) => {
     res.json(botState);
 });
 
-app.post('/api/set-timeframe', (req, res) => {
-    if (req.body && req.body.timeframe) {
-        botState.timeframe = req.body.timeframe;
-        addLog(`Zaman dilimi değiştirildi: ${botState.timeframe}`);
-        res.json({ success: true, timeframe: botState.timeframe });
-    } else {
-        res.status(400).json({ success: false });
-    }
-});
-
-// Ana sayfa için statik HTML servisi
+// Ana Sayfa
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '2ema arası cıkıs.html'));
 });
 
-// Zamanlayıcılar (Arka planda aralıksız çalışır)
+// Zamanlayıcılar (Arka Planda Sürekli Çalışır)
 setInterval(arkaPlanTaramasiYap, 10 * 60 * 1000); // Her 10 dakikada bir tarama
-setInterval(acikIslemleriTakipEt, 10000); // Her 10 saniyede bir fiyat kontrolü
+setInterval(acikIslemleriTakipEt, 10000); // Her 10 saniyede bir fiyat takibi
 
 app.listen(PORT, () => {
     addLog(`Sunucu ${PORT} portunda 7/24 Arka Plan Modunda Başlatıldı.`);
-    // İlk açılışta hemen tarama tetikle
-    setTimeout(arkaPlanTaramasiYap, 5000);
+    setTimeout(arkaPlanTaramasiYap, 3000);
 });
