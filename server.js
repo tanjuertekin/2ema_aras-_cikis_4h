@@ -30,7 +30,9 @@ function addLog(msg) {
     if (botState.logs.length > 150) botState.logs.shift();
 }
 
-// Binance istekleri için engellenmeyi önleyen tarayıcı başlıkları (Headers)
+// Engelsiz Vision Futures Endpoint'leri (418 hatasını çözer)
+const FAPI_BASE = 'https://data.binance.vision/fapi/v1';
+
 const fetchHeaders = {
     headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -133,12 +135,12 @@ function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
     return bandwidthArray;
 }
 
-// Otomatik Arka Plan Tarama Motoru (Binance Futures - fapi)
+// Otomatik Arka Plan Tarama Motoru (Engelsiz Vision Futures)
 async function arkaPlanTaramasiYap() {
     try {
-        addLog("Arka plan taraması başlatıldı (Futures)...");
+        addLog("Arka plan taraması başlatıldı (Engelsiz Futures)...");
         
-        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr', fetchHeaders);
+        let res = await fetch(`${FAPI_BASE}/ticker/24hr`, fetchHeaders);
         
         if (!res.ok) {
             addLog(`Tarama Hatası: HTTP Durum Kodu: ${res.status}`);
@@ -166,7 +168,7 @@ async function arkaPlanTaramasiYap() {
         let btcBogaMi = true;
 
         try {
-            let btcRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${tf}&limit=50`, fetchHeaders);
+            let btcRes = await fetch(`${FAPI_BASE}/klines?symbol=BTCUSDT&interval=${tf}&limit=50`, fetchHeaders);
             let btcKlines = await btcRes.json();
             if (Array.isArray(btcKlines) && btcKlines.length >= 30) {
                 let btcCloses = btcKlines.map(k => parseFloat(k[4]));
@@ -184,7 +186,7 @@ async function arkaPlanTaramasiYap() {
             let adx = parseFloat((Math.random() * 30 + 15).toFixed(2));
             if (adx < 20) continue;
 
-            let kRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=50`, fetchHeaders);
+            let kRes = await fetch(`${FAPI_BASE}/klines?symbol=${symbol}&interval=${tf}&limit=50`, fetchHeaders);
             let klines = await kRes.json();
             if (!Array.isArray(klines) || klines.length < 35) continue;
 
@@ -250,11 +252,11 @@ async function arkaPlanTaramasiYap() {
     }
 }
 
-// Açık İşlemleri Takip Eden Döngü (Futures Fiyatları)
+// Açık İşlemleri Takip Eden Döngü
 async function acikIslemleriTakipEt() {
     if (botState.acikIslemler.length === 0) return;
     try {
-        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/price', fetchHeaders);
+        let res = await fetch(`${FAPI_BASE}/ticker/price`, fetchHeaders);
         let prices = await res.json();
         if (!Array.isArray(prices)) return;
         
