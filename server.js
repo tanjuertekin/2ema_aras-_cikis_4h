@@ -125,16 +125,29 @@ function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
     return bandwidthArray;
 }
 
-// Otomatik Arka Plan Tarama Motoru (Güvenli Sürüm)
+// Otomatik Arka Plan Tarama Motoru
 async function arkaPlanTaramasiYap() {
     try {
         addLog("Arka plan taraması başlatıldı...");
-        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
+        
+        // Binance'e tarayıcı gibi görünmek için header ekliyoruz
+        let fetchOptions = {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+            }
+        };
+
+        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr', fetchOptions);
+        
+        if (!res.ok) {
+            addLog(`Tarama Hatası: Binance HTTP Durum Kodu: ${res.status}`);
+            return;
+        }
+
         let data = await res.json();
 
-        // Gelen verinin dizi (Array) olup olmadığını kontrol ediyoruz
         if (!Array.isArray(data)) {
-            addLog("Tarama Hatası: Binance'ten geçerli liste alınamadı, tekrar denenecek.");
+            addLog("Tarama Hatası: Binance'ten dizi verisi dönmedi.");
             return;
         }
 
@@ -152,7 +165,7 @@ async function arkaPlanTaramasiYap() {
         let btcBogaMi = true;
 
         try {
-            let btcRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${tf}&limit=50`);
+            let btcRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${tf}&limit=50`, fetchOptions);
             let btcKlines = await btcRes.json();
             if (Array.isArray(btcKlines) && btcKlines.length >= 30) {
                 let btcCloses = btcKlines.map(k => parseFloat(k[4]));
@@ -170,7 +183,7 @@ async function arkaPlanTaramasiYap() {
             let adx = parseFloat((Math.random() * 30 + 15).toFixed(2));
             if (adx < 20) continue;
 
-            let kRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=50`);
+            let kRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=50`, fetchOptions);
             let klines = await kRes.json();
             if (!Array.isArray(klines) || klines.length < 35) continue;
 
@@ -232,7 +245,7 @@ async function arkaPlanTaramasiYap() {
         });
 
     } catch (e) {
-        addLog("Tarama Hatası: " + e.message);
+        addLog("Tarama Kritik Hata: " + e.message);
     }
 }
 
@@ -240,8 +253,12 @@ async function arkaPlanTaramasiYap() {
 async function acikIslemleriTakipEt() {
     if (botState.acikIslemler.length === 0) return;
     try {
-        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/price');
+        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/price', {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+        });
         let prices = await res.json();
+        if (!Array.isArray(prices)) return;
+        
         let pMap = {};
         prices.forEach(p => pMap[p.symbol] = parseFloat(p.price));
 
