@@ -125,12 +125,19 @@ function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
     return bandwidthArray;
 }
 
-// Otomatik Arka Plan Tarama Motoru
+// Otomatik Arka Plan Tarama Motoru (Güvenli Sürüm)
 async function arkaPlanTaramasiYap() {
     try {
         addLog("Arka plan taraması başlatıldı...");
         let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr');
         let data = await res.json();
+
+        // Gelen verinin dizi (Array) olup olmadığını kontrol ediyoruz
+        if (!Array.isArray(data)) {
+            addLog("Tarama Hatası: Binance'ten geçerli liste alınamadı, tekrar denenecek.");
+            return;
+        }
+
         let top50 = data.filter(i => i.symbol.endsWith('USDT') && !i.symbol.includes('USDC'))
             .sort((a,b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume)).slice(0, 50);
 
@@ -211,7 +218,6 @@ async function arkaPlanTaramasiYap() {
         botState.lastScanTime = new Date().toLocaleString('tr-TR');
         addLog(`Tarama bitti. Uygun parite: ${yeniSonuclar.length}`);
 
-        // Otomatik İşlem Açma
         yeniSonuclar.forEach(item => {
             if (!botState.acikIslemler.some(i => i.symbol === item.symbol && i.tf === item.tf)) {
                 botState.acikIslemler.push({
@@ -266,9 +272,19 @@ function islemKapatArkaPlanda(symbol, cikisFiyati, sonuc) {
     }
 }
 
-// Arayüzün sunucudan verileri çekmesi için API endpoint'i
+// API Endpointleri
 app.get('/api/state', (req, res) => {
     res.json(botState);
+});
+
+app.post('/api/set-timeframe', (req, res) => {
+    if (req.body && req.body.timeframe) {
+        botState.timeframe = req.body.timeframe;
+        addLog(`Zaman dilimi değiştirildi: ${botState.timeframe}`);
+        res.json({ success: true, timeframe: botState.timeframe });
+    } else {
+        res.status(400).json({ success: false });
+    }
 });
 
 // Ana Sayfa
