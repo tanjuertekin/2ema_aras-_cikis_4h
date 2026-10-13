@@ -1,7 +1,7 @@
-﻿{
-  "name": "kripto-test-paneli",
+{
+  "name": "kripto-bot-arka-plan",
   "version": "1.0.0",
-  "description": "7/24 Kripto Test Paneli",
+  "description": "7/24 Arka Planda Çalışan Binance Bot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
