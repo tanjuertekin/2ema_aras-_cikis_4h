@@ -125,7 +125,7 @@ function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
     return bandwidthArray;
 }
 
-// Otomatik Arka Plan Tarama Motoru (Engelsiz Vision API)
+// Otomatik Arka Plan Tarama Motoru (Vision API - Spot v3 Endpoint)
 async function arkaPlanTaramasiYap() {
     try {
         addLog("Arka plan taraması başlatıldı...");
@@ -144,7 +144,7 @@ async function arkaPlanTaramasiYap() {
             return;
         }
 
-        let top50 = data.filter(i => i.symbol.endsWith('USDT') && !i.symbol.includes('USDC'))
+        let top50 = data.filter(i => i.symbol.endsWith('USDT') && !i.symbol.includes('USDC') && !i.symbol.includes('UP') && !i.symbol.includes('DOWN'))
             .sort((a,b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume)).slice(0, 50);
 
         let anlikFiyatlarMap = {};
