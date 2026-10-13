@@ -125,29 +125,22 @@ function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
     return bandwidthArray;
 }
 
-// Otomatik Arka Plan Tarama Motoru
+// Otomatik Arka Plan Tarama Motoru (Engelsiz Vision API)
 async function arkaPlanTaramasiYap() {
     try {
         addLog("Arka plan taraması başlatıldı...");
         
-        // Binance'e tarayıcı gibi görünmek için header ekliyoruz
-        let fetchOptions = {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-            }
-        };
-
-        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/24hr', fetchOptions);
+        let res = await fetch('https://data.binance.vision/api/v3/ticker/24hr');
         
         if (!res.ok) {
-            addLog(`Tarama Hatası: Binance HTTP Durum Kodu: ${res.status}`);
+            addLog(`Tarama Hatası: HTTP Durum Kodu: ${res.status}`);
             return;
         }
 
         let data = await res.json();
 
         if (!Array.isArray(data)) {
-            addLog("Tarama Hatası: Binance'ten dizi verisi dönmedi.");
+            addLog("Tarama Hatası: Dizi verisi dönmedi.");
             return;
         }
 
@@ -165,7 +158,7 @@ async function arkaPlanTaramasiYap() {
         let btcBogaMi = true;
 
         try {
-            let btcRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=BTCUSDT&interval=${tf}&limit=50`, fetchOptions);
+            let btcRes = await fetch(`https://data.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=${tf}&limit=50`);
             let btcKlines = await btcRes.json();
             if (Array.isArray(btcKlines) && btcKlines.length >= 30) {
                 let btcCloses = btcKlines.map(k => parseFloat(k[4]));
@@ -183,7 +176,7 @@ async function arkaPlanTaramasiYap() {
             let adx = parseFloat((Math.random() * 30 + 15).toFixed(2));
             if (adx < 20) continue;
 
-            let kRes = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=50`, fetchOptions);
+            let kRes = await fetch(`https://data.binance.vision/api/v3/klines?symbol=${symbol}&interval=${tf}&limit=50`);
             let klines = await kRes.json();
             if (!Array.isArray(klines) || klines.length < 35) continue;
 
@@ -253,9 +246,7 @@ async function arkaPlanTaramasiYap() {
 async function acikIslemleriTakipEt() {
     if (botState.acikIslemler.length === 0) return;
     try {
-        let res = await fetch('https://fapi.binance.com/fapi/v1/ticker/price', {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-        });
+        let res = await fetch('https://data.binance.vision/api/v3/ticker/price');
         let prices = await res.json();
         if (!Array.isArray(prices)) return;
         
