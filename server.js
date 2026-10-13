@@ -30,15 +30,28 @@ function addLog(msg) {
     if (botState.logs.length > 150) botState.logs.shift();
 }
 
-// Engelsiz Proxy üzerinden Binance Futures Veri Çekme Fonksiyonu
-async function fetchBinanceFutures(endpoint) {
-    let targetUrl = `https://fapi.binance.com/fapi/v1${endpoint}`;
-    // Cloudflare/418 engelini aşmak için proxy yönlendiricisi kullanıyoruz
-    let proxyUrl = `https://api.allorigins.win/raw?url=` + encodeURIComponent(targetUrl);
-    
-    let res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error(`HTTP Durum Kodu: ${res.status}`);
-    return await res.json();
+// Doğrudan Binance Futures Resmi Adresi ve Zaman Aşımı Ayarlı İstek
+const FAPI_BASE = 'https://fapi.binance.com/fapi/v1';
+
+async function fetchWithTimeout(url, options = {}, timeout = 15000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'application/json',
+                ...options.headers
+            }
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
 }
 
 // Teknik İndikatör Hesaplamaları
@@ -136,13 +149,18 @@ function calculateBollingerBandwidth(closes, period = 20, multiplier = 2) {
     return bandwidthArray;
 }
 
-// Otomatik Arka Plan Tarama Motoru (Proxy Destekli Futures)
+// Otomatik Arka Plan Tarama Motoru (Doğrudan Futures)
 async function arkaPlanTaramasiYap() {
     try {
-        addLog("Arka plan taraması başlatıldı (Proxy Futures)...");
+        addLog("Arka plan taraması başlatıldı (Doğrudan Futures)...");
         
-        let data = await fetchBinanceFutures('/ticker/24hr');
+        let res = await fetchWithTimeout(`${FAPI_BASE}/ticker/24hr`);
+        if (!res.ok) {
+            addLog(`Tarama Hatası: HTTP Durum Kodu: ${res.status}`);
+            return;
+        }
 
+        let data = await res.json();
         if (!Array.isArray(data)) {
             addLog("Tarama Hatası: Dizi verisi dönmedi.");
             return;
@@ -162,7 +180,8 @@ async function arkaPlanTaramasiYap() {
         let btcBogaMi = true;
 
         try {
-            let btcKlines = await fetchBinanceFutures(`/klines?symbol=BTCUSDT&interval=${tf}&limit=50`);
+            let btcRes = await fetchWithTimeout(`${FAPI_BASE}/klines?symbol=BTCUSDT&interval=${tf}&limit=50`);
+            let btcKlines = await btcRes.json();
             if (Array.isArray(btcKlines) && btcKlines.length >= 30) {
                 let btcCloses = btcKlines.map(k => parseFloat(k[4]));
                 let btcEma21 = calculateEMA(btcCloses, 21);
@@ -179,7 +198,8 @@ async function arkaPlanTaramasiYap() {
             let adx = parseFloat((Math.random() * 30 + 15).toFixed(2));
             if (adx < 20) continue;
 
-            let klines = await fetchBinanceFutures(`/klines?symbol=${symbol}&interval=${tf}&limit=50`);
+            let kRes = await fetchWithTimeout(`${FAPI_BASE}/klines?symbol=${symbol}&interval=${tf}&limit=50`);
+            let klines = await kRes.json();
             if (!Array.isArray(klines) || klines.length < 35) continue;
 
             let closes = klines.map(k => parseFloat(k[4]));
@@ -248,7 +268,8 @@ async function arkaPlanTaramasiYap() {
 async function acikIslemleriTakipEt() {
     if (botState.acikIslemler.length === 0) return;
     try {
-        let prices = await fetchBinanceFutures('/ticker/price');
+        let res = await fetchWithTimeout(`${FAPI_BASE}/ticker/price`);
+        let prices = await res.json();
         if (!Array.isArray(prices)) return;
         
         let pMap = {};
